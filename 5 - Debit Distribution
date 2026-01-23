@@ -42,3 +42,4 @@ print(f"\n✅ Analysis completed")
 print(f"   ICS Stat Code O Accounts: {len(ics_stat_o):,}")
 print(f"   With Debit: {int((ics_stat_o['Debit?'] == 'Yes').sum()):,}")
 print(f"   Without Debit: {int((ics_stat_o['Debit?'] == 'No').sum()):,}")
+
