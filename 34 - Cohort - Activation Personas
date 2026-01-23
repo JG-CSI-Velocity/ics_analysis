@@ -1,83 +1,94 @@
 # ============================================
-# A[X].28 - ICS STAT CODE O - ACTIVATION CATEGORIES
+# A[X].28 - ICS STAT CODE O - ACTIVATION CATEGORIES (FINAL)
 # ============================================
 
 print("\n📊 A[X].28 - Categorizing ICS Stat Code O Accounts by Behavior...")
 
-# Get ICS Stat Code O accounts with debit cards opened in 2025
-ics_stat_o = data[(data['ICS Account'] == 'Yes') & (data['Stat Code'] == 'O') & (data['Debit?'] == 'Yes')].copy()
+import numpy as np
+import pandas as pd
 
-# Convert Date Opened to datetime
-ics_stat_o['Date Opened'] = pd.to_datetime(ics_stat_o['Date Opened'], errors='coerce')
+# 1) Slice ICS Stat O Debit Accounts
+ics_stat_o = data[
+    (data['ICS Account'] == 'Yes') &
+    (data['Stat Code'].astype(str).str.upper().str.strip() == 'O') &
+    (data['Debit?'] == 'Yes')
+].copy()
+
+ics_stat_o['Date Opened']   = pd.to_datetime(ics_stat_o['Date Opened'], errors='coerce')
 ics_stat_o['Opening Month'] = ics_stat_o['Date Opened'].dt.to_period('M').astype(str)
 
-# Filter to 2025 cohorts only - and only cohorts with at least 3 months of data
+# Restrict to 2025 cohorts only
 ics_2025 = ics_stat_o[ics_stat_o['Opening Month'] >= '2025-01'].copy()
 
-# Categorize each account
+# 2) Categorize each account
 categories = []
 
-for idx, account in ics_2025.iterrows():
-    opening_date = pd.to_datetime(account['Opening Month'])
-    
-    # Check if account has at least 3 months of data
+for idx, acct in ics_2025.iterrows():
+    opening_date = pd.to_datetime(acct['Opening Month'])
+
+    # Check if M3 exists in the L12M window
     month_3_date = opening_date + pd.DateOffset(months=2)
     month_3_str = month_3_date.strftime('%b%y')
-    
+
     if month_3_str not in last_12_months:
-        continue  # Skip accounts without 3 months of data
-    
-    # Get M1 and M3 activity
+        continue  # Skip accounts with insufficient data
+
+    # Pull M1 & M3 swipes safely
     month_1_str = opening_date.strftime('%b%y')
-    m1_swipes = account[f"{month_1_str} Swipes"] if f"{month_1_str} Swipes" in account else 0
-    m3_swipes = account[f"{month_3_str} Swipes"] if f"{month_3_str} Swipes" in account else 0
-    
-    # Categorize
+    m1_col = f"{month_1_str} Swipes"
+    m3_col = f"{month_3_str} Swipes"
+
+    m1_swipes = float(acct[m1_col]) if (m1_col in acct and pd.notna(acct[m1_col])) else 0.0
+    m3_swipes = float(acct[m3_col]) if (m3_col in acct and pd.notna(acct[m3_col])) else 0.0
+
+    # Activation logic
     if m1_swipes > 0 and m3_swipes > 0:
-        category = 'Fast Activator'  # Active in M1 and still active in M3
+        category = 'Fast Activator'
     elif m1_swipes == 0 and m3_swipes > 0:
-        category = 'Slow Burner'  # Not active in M1 but active by M3
+        category = 'Slow Burner'
     elif m1_swipes > 0 and m3_swipes == 0:
-        category = 'One and Done'  # Active in M1 but dropped off by M3
+        category = 'One and Done'
     else:
-        category = 'Never Activator'  # Not active in M1 or M3
-    
+        category = 'Never Activator'
+
     categories.append({
-        'Account': account.name,
-        'Opening Month': account['Opening Month'],
+        'Account': idx,
+        'Opening Month': acct['Opening Month'],
         'Category': category,
         'M1 Swipes': m1_swipes,
         'M3 Swipes': m3_swipes
     })
 
-# Create summary by category
 category_df = pd.DataFrame(categories)
 
+# 3) Build summary table
 if len(category_df) > 0:
+
     category_summary = category_df.groupby('Category').agg({
         'Account': 'count',
         'M1 Swipes': 'sum',
         'M3 Swipes': 'sum'
     }).reset_index()
-    
+
     category_summary.columns = ['Category', 'Account Count', 'Total M1 Swipes', 'Total M3 Swipes']
-    category_summary['% of Total'] = (category_summary['Account Count'] / len(category_df)).round(2)
-    
-    # Order by desirability
+    category_summary['% of Total'] = category_summary['Account Count'] / len(category_df)
+
+    # Desired ordering
     category_order = ['Fast Activator', 'Slow Burner', 'One and Done', 'Never Activator']
     category_summary['Category'] = pd.Categorical(category_summary['Category'], categories=category_order, ordered=True)
-    ax28_categories = category_summary.sort_values('Category').reset_index(drop=True)
-    
-    # Add total row
+    category_summary = category_summary.sort_values('Category').reset_index(drop=True)
+
+    # Add TOTAL row
     total_row = pd.DataFrame({
         'Category': ['Total'],
-        'Account Count': [ax28_categories['Account Count'].sum()],
-        'Total M1 Swipes': [ax28_categories['Total M1 Swipes'].sum()],
-        'Total M3 Swipes': [ax28_categories['Total M3 Swipes'].sum()],
+        'Account Count': [category_summary['Account Count'].sum()],
+        'Total M1 Swipes': [category_summary['Total M1 Swipes'].sum()],
+        'Total M3 Swipes': [category_summary['Total M3 Swipes'].sum()],
         '% of Total': [1.0]
     })
-    
-    ax28_categories = pd.concat([ax28_categories, total_row], ignore_index=True)
+
+    ax28_categories = pd.concat([category_summary, total_row], ignore_index=True)
+
 else:
     ax28_categories = pd.DataFrame({
         'Category': ['No data available'],
@@ -87,11 +98,67 @@ else:
         '% of Total': [0]
     })
 
-# Display
+# ---- SEND NUMERIC DF TO FORMATTER (NaN becomes blank; % stays fraction; $ rendered upstream) ----
 display_formatted(ax28_categories, "ICS Stat Code O - Account Activation Categories")
 
-print(f"\n✅ Analysis completed")
+# -----------------------------------------------
+# 4) PRINT DETAILED TEXT SUMMARY FOR THE REPORT
+# -----------------------------------------------
+
+print("\n" + "="*80)
+print("📊 ICS STAT CODE O - ACTIVATION CATEGORY SUMMARY")
+print("="*80)
+
 if len(category_df) > 0:
-    print(f"   Accounts Categorized: {len(category_df):,}")
-    print(f"   Fast Activators: {len(category_df[category_df['Category'] == 'Fast Activator']):,}")
-    print(f"   Never Activators: {len(category_df[category_df['Category'] == 'Never Activator']):,}")
+
+    print(f"\n🔢 OVERALL METRICS:")
+    print(f"   Total Accounts Analyzed: {len(category_df):,}")
+    print(f"   Total M1 Swipes: {category_df['M1 Swipes'].sum():,.0f}")
+    print(f"   Total M3 Swipes: {category_df['M3 Swipes'].sum():,.0f}")
+
+    if category_df['M1 Swipes'].sum() > 0:
+        growth = ((category_df['M3 Swipes'].sum() - category_df['M1 Swipes'].sum())
+                  / category_df['M1 Swipes'].sum() * 100)
+        print(f"   Growth M1→M3: {growth:.1f}%")
+
+    # Category breakdown
+    for category in category_order:
+        subset = category_df[category_df['Category'] == category]
+        if len(subset) == 0:
+            continue
+
+        count = len(subset)
+        pct = count / len(category_df) * 100
+        m1 = subset['M1 Swipes'].sum()
+        m3 = subset['M3 Swipes'].sum()
+
+        # Labeling
+        if category == 'Fast Activator': emoji, label = '✅', 'FAST ACTIVATORS (Good!)'
+        elif category == 'Slow Burner': emoji, label = '🔥', 'SLOW BURNERS (Acceptable)'
+        elif category == 'One and Done': emoji, label = '⚠️', 'ONE AND DONE (Concerning)'
+        else: emoji, label = '❌', 'NEVER ACTIVATORS (Problem)'
+
+        print(f"\n{emoji} {label}")
+        print(f"   Count: {count:,} ({pct:.1f}%)")
+        print(f"   M1 Swipes: {m1:,.0f}")
+        print(f"   M3 Swipes: {m3:,.0f}")
+
+    # Key insights
+    fast = len(category_df[category_df['Category'] == 'Fast Activator'])
+    never = len(category_df[category_df['Category'] == 'Never Activator'])
+    success_rate = fast / len(category_df) * 100
+    problem_rate = never / len(category_df) * 100
+
+    print("\n💡 KEY INSIGHTS:")
+    print(f"   Success Rate (Fast Activators): {success_rate:.1f}%")
+    print(f"   Problem Rate (Never Activators): {problem_rate:.1f}%")
+
+    if success_rate >= 70:
+        print("   ✅ Strong activation performance!")
+    elif success_rate >= 50:
+        print("   ⚠️ Moderate activation - room for improvement")
+    else:
+        print("   ❌ Low activation - needs attention")
+
+print("\n" + "="*80)
+print("✅ Analysis completed")
