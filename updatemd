@@ -1,0 +1,13 @@
+ics_append (merges REF + DM into ODDD):                                                                  
+  git clone https://github.com/JG-CSI-Velocity/ics_append.git
+  cd ics_append                                                                                            
+  git checkout feat/modular-pipeline                        
+  pip install -r requirements.txt
+  python -m ics_append --help                    
+
+  ics_analysis (runs 37 analyses on the annotated ODDD):
+  git clone https://github.com/JG-CSI-Velocity/ics_analysis.git
+  cd ics_analysis
+  git checkout feat/modular-pipeline
+  pip install -r requirements.txt
+  python -m ics_analysis --help
