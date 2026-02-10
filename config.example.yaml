@@ -1,0 +1,67 @@
+# ICS Analysis Configuration
+# Copy this file to config.yaml and adjust values for your client.
+
+# Path to the client data file (CSV or Excel)
+data_file: "data/client_oddd.xlsx"
+
+# Client identification
+client_id: "1453"
+client_name: "Sample Credit Union"
+
+# Output directory for reports
+output_dir: "output/"
+
+# Cohort analysis start month (YYYY-MM format)
+cohort_start: "2025-01"
+
+# ICS accounts not present in the data dump (added to stat code totals)
+ics_not_in_dump: 0
+
+# Balance tier configuration
+balance_tiers:
+  bins: [-inf, 0, 1000, 5000, 10000, 25000, 50000, 100000, inf]
+  labels:
+    - "$0 or Less"
+    - "$0-$1K"
+    - "$1K-$5K"
+    - "$5K-$10K"
+    - "$10K-$25K"
+    - "$25K-$50K"
+    - "$50K-$100K"
+    - "$100K+"
+
+# Account age range configuration
+age_ranges:
+  bins: [0, 30, 90, 180, 365, 730, 1825, 3650, inf]
+  labels:
+    - "0-1 month"
+    - "1-3 months"
+    - "3-6 months"
+    - "6-12 months"
+    - "1-2 years"
+    - "2-5 years"
+    - "5-10 years"
+    - "10+ years"
+
+# Output format controls
+outputs:
+  excel: true
+  powerpoint: true
+  html_charts: false
+
+# Chart rendering settings
+charts:
+  theme: "plotly_white"
+  colors:
+    - "#1B365D"
+    - "#4A90D9"
+    - "#7BC67E"
+    - "#F5A623"
+    - "#D0021B"
+    - "#8B572A"
+  width: 900
+  height: 500
+  scale: 3
+
+# PPTX template path (optional; omit for default presentation)
+# pptx_template: "templates/csi_template.pptx"
